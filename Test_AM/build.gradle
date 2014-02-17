@@ -1,0 +1,5 @@
+project.ext.mainclass = 'com.hortonworks.TestApplicationMaster'
+project.ext.archiveName = 'testam.jar'
+
+apply from: '/home/train/labs/build.gradle'
+

@@ -1,0 +1,5 @@
+project.ext.mainclass = 'com.hortonworks.TestClient'
+project.ext.archiveName = 'testclient.jar'
+
+apply from: '/home/train/labs/build.gradle'
+
