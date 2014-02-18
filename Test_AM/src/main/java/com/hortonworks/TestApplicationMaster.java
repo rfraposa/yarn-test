@@ -65,31 +65,38 @@ public class TestApplicationMaster {
 		//Create a Container to run httpd
 		Priority httpdPriority = Records.newRecord(Priority.class);
 		httpdPriority.setPriority(0);
-		
 		Resource capHttp = Records.newRecord(Resource.class);
-		capHttp.setMemory(256);
+		capHttp.setMemory(128);
 		ContainerRequest httpAsk = new ContainerRequest(capHttp,null,null,httpdPriority);
 		LOG.info("Requesting a Container for httpd");
 		resourceManager.addContainerRequest(httpAsk);
 		LOG.info("Allocating the httpd Container...");
-		AllocateResponse allocResponse = resourceManager.allocate(0);	
-		LOG.info("Containers allocated with resources " + allocResponse.getAvailableResources());
-		LOG.info("Number of Containers allocated = " + allocResponse.getAllocatedContainers().size());
 		
-		for(Container container : allocResponse.getAllocatedContainers()) {
-			//Launch httpd on its Container
-			ContainerLaunchContext ctx = Records.newRecord(ContainerLaunchContext.class);
-			String httpdCommand = "/etc/init.d/httpd start";
-			ctx.setCommands(
-					Collections.singletonList(httpdCommand
-							+ " 1>/tmp/httpdstdout"
-							+ " 2>/tmp/httpdstderr")
-				);
-			LOG.info("Starting httpd Container...");
-			nodeManager.startContainer(container, ctx);
-			LOG.info("httpd is now running on host " + container.getNodeHttpAddress());
-
+		int allocatedContainers = 0;
+		while(allocatedContainers < 1) {
+			AllocateResponse allocResponse = resourceManager.allocate(0);	
+			LOG.info("Containers allocated with resources " + allocResponse.getAvailableResources());
+			for(Container container : allocResponse.getAllocatedContainers()) {
+				++allocatedContainers;
+				//Launch httpd on its Container
+				ContainerLaunchContext ctx = Records.newRecord(ContainerLaunchContext.class);
+				String httpdCommand = "/etc/init.d/httpd start";
+				ctx.setCommands(
+						Collections.singletonList(httpdCommand
+								+ " 1>/tmp/httpdstdout"
+								+ " 2>/tmp/httpdstderr")
+					);
+				LOG.info("Starting httpd Container...");
+				nodeManager.startContainer(container, ctx);
+				LOG.info("httpd is now running on host " + container.getNodeHttpAddress());
+				try {
+					Thread.sleep(10000);
+				} catch (InterruptedException e) {}
+			}
+			
 		}
+//		LOG.info("Number of Containers allocated = " + allocResponse.getAllocatedContainers().size());
+		
 		return true;
 	}
 	
