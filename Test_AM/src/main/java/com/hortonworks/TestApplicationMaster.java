@@ -5,25 +5,29 @@ import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest;
 import org.apache.hadoop.yarn.client.api.async.AMRMClientAsync;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.util.Records;
+
 
 public class TestApplicationMaster {
 
 	private static final Log LOG = LogFactory.getLog(TestApplicationMaster.class);
 	private YarnConfiguration conf;
-	private AMRMClientAsync amRMClient;
-	private AMRMClientAsync<ContainerRequest> resourceManager;
+	private AMRMClient<ContainerRequest> resourceManager;
 	
 	public TestApplicationMaster() {
 		conf = new YarnConfiguration();
-		amRMClient = AMRMClientAsync.createAMRMClientAsync(1000, null);
-		amRMClient.init(conf);
-		amRMClient.start();
+		resourceManager = AMRMClient.createAMRMClient();
+		resourceManager.init(conf);
+		resourceManager.start();
 	}
 	
 	public static void main(String [] args) {
@@ -40,11 +44,6 @@ public class TestApplicationMaster {
 	public boolean run() throws YarnException, IOException {
 		LOG.info("Running TestApplicationMaster...");
 		
-		//We need to communicate with the ResourceManager, so initialize the service
-		resourceManager = AMRMClientAsync.createAMRMClientAsync(1000, null);
-		resourceManager.init(conf);
-		resourceManager.start();
-		
 		//Register this ApplicationMaster with the ResourceManager
 		String appHostName = NetUtils.getHostname();
 		int appHostPort = -1;
@@ -53,6 +52,13 @@ public class TestApplicationMaster {
 
 		LOG.info("ApplicationMaster is registered with response: " + response.toString());
 		
+		//Create a Container to run httpd
+		Resource capHttp = Records.newRecord(Resource.class);
+		capHttp.setMemory(256);
+		capHttp.setVirtualCores(1);
+		ContainerRequest httpAsk = new ContainerRequest(capHttp,null,null,null);
+		resourceManager.addContainerRequest(httpAsk);
+		AllocateResponse allocResponse = resourceManager.allocate(0);		
 		return true;
 	}
 	
