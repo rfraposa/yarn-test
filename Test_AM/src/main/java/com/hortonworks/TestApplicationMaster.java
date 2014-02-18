@@ -1,17 +1,20 @@
 package com.hortonworks;
 
 import java.io.IOException;
+import java.util.Collections;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
+import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest;
-import org.apache.hadoop.yarn.client.api.async.AMRMClientAsync;
+import org.apache.hadoop.yarn.client.api.NMClient;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.Records;
@@ -22,12 +25,17 @@ public class TestApplicationMaster {
 	private static final Log LOG = LogFactory.getLog(TestApplicationMaster.class);
 	private YarnConfiguration conf;
 	private AMRMClient<ContainerRequest> resourceManager;
+	private NMClient nodeManager;
 	
 	public TestApplicationMaster() {
 		conf = new YarnConfiguration();
 		resourceManager = AMRMClient.createAMRMClient();
 		resourceManager.init(conf);
 		resourceManager.start();
+		
+		nodeManager = NMClient.createNMClient();
+		nodeManager.init(conf);
+		nodeManager.start();
 	}
 	
 	public static void main(String [] args) {
@@ -57,15 +65,32 @@ public class TestApplicationMaster {
 		capHttp.setMemory(256);
 		capHttp.setVirtualCores(1);
 		ContainerRequest httpAsk = new ContainerRequest(capHttp,null,null,null);
+		LOG.info("Requesting a Container for httpd");
 		resourceManager.addContainerRequest(httpAsk);
-		AllocateResponse allocResponse = resourceManager.allocate(0);		
+		LOG.info("Allocating the httpd Container...");
+		AllocateResponse allocResponse = resourceManager.allocate(0);	
+		LOG.info("httpd Container allocated with resources " + allocResponse.getAvailableResources());
+		for(Container container : allocResponse.getAllocatedContainers()) {
+			//Launch httpd on its Container
+			ContainerLaunchContext ctx = Records.newRecord(ContainerLaunchContext.class);
+			String httpdCommand = "service httpd start";
+			ctx.setCommands(
+					Collections.singletonList(httpdCommand
+							+ " 1>/tmp/httpdstdout"
+							+ " 2>/tmp/httpdstderr")
+				);
+			LOG.info("Starting httpd Container...");
+			nodeManager.startContainer(container, ctx);
+			LOG.info("httpd is now running on host " + container.getNodeHttpAddress());
+
+		}
 		return true;
 	}
 	
 	private boolean finish() {
 		LOG.info("Finishing TestApplicationMaster...");
 		try {
-			amRMClient.unregisterApplicationMaster(FinalApplicationStatus.SUCCEEDED, "Finishing TestApplicationMaster", null);
+			resourceManager.unregisterApplicationMaster(FinalApplicationStatus.SUCCEEDED, "Finishing TestApplicationMaster", null);
 		} catch (YarnException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
