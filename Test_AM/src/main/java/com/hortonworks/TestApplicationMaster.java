@@ -11,6 +11,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRespo
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest;
@@ -18,6 +19,7 @@ import org.apache.hadoop.yarn.client.api.NMClient;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.Records;
+
 
 
 public class TestApplicationMaster {
@@ -61,19 +63,23 @@ public class TestApplicationMaster {
 		LOG.info("ApplicationMaster is registered with response: " + response.toString());
 		
 		//Create a Container to run httpd
+		Priority httpdPriority = Records.newRecord(Priority.class);
+		httpdPriority.setPriority(0);
+		
 		Resource capHttp = Records.newRecord(Resource.class);
 		capHttp.setMemory(256);
-		capHttp.setVirtualCores(1);
-		ContainerRequest httpAsk = new ContainerRequest(capHttp,null,null,null);
+		ContainerRequest httpAsk = new ContainerRequest(capHttp,null,null,httpdPriority);
 		LOG.info("Requesting a Container for httpd");
 		resourceManager.addContainerRequest(httpAsk);
 		LOG.info("Allocating the httpd Container...");
 		AllocateResponse allocResponse = resourceManager.allocate(0);	
-		LOG.info("httpd Container allocated with resources " + allocResponse.getAvailableResources());
+		LOG.info("Containers allocated with resources " + allocResponse.getAvailableResources());
+		LOG.info("Number of Containers allocated = " + allocResponse.getAllocatedContainers().size());
+		
 		for(Container container : allocResponse.getAllocatedContainers()) {
 			//Launch httpd on its Container
 			ContainerLaunchContext ctx = Records.newRecord(ContainerLaunchContext.class);
-			String httpdCommand = "service httpd start";
+			String httpdCommand = "/etc/init.d/httpd start";
 			ctx.setCommands(
 					Collections.singletonList(httpdCommand
 							+ " 1>/tmp/httpdstdout"
