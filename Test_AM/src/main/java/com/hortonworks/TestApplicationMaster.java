@@ -80,7 +80,7 @@ public class TestApplicationMaster {
 				++allocatedContainers;
 				//Launch httpd on its Container
 				ContainerLaunchContext ctx = Records.newRecord(ContainerLaunchContext.class);
-				String httpdCommand = "/etc/init.d/httpd start";
+				String httpdCommand = "/usr/sbin/httpd -k start";
 				ctx.setCommands(
 						Collections.singletonList(httpdCommand
 								+ " 1>/tmp/httpdstdout"
@@ -89,13 +89,15 @@ public class TestApplicationMaster {
 				LOG.info("Starting httpd Container...");
 				nodeManager.startContainer(container, ctx);
 				LOG.info("httpd is now running on host " + container.getNodeHttpAddress());
-				try {
-					Thread.sleep(10000);
-				} catch (InterruptedException e) {}
 			}
-			
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {}
 		}
-//		LOG.info("Number of Containers allocated = " + allocResponse.getAllocatedContainers().size());
+		LOG.info("httpd Container is running...");
+		try {
+			Thread.sleep(90000);
+		} catch (InterruptedException e) {}
 		
 		return true;
 	}

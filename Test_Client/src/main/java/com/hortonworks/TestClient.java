@@ -50,12 +50,11 @@ public class TestClient {
 	
 	public TestClient(String [] args) {
 		this.conf = new YarnConfiguration();
-		if(args.length < 2) {
-			System.out.println("Usage: TestClient <resourcemanager_ip> <job_input_folder>");
+		if(args.length < 1) {
+			System.out.println("Usage: TestClient <job_input_folder>");
 			System.exit(1);
 		}
-		conf.set("yarn.resourcemanager.address", args[0]);
-		jobInputFolder = args[1];
+		jobInputFolder = args[0];
 		yarnClient = YarnClient.createYarnClient();
 		yarnClient.init(conf);
 		
