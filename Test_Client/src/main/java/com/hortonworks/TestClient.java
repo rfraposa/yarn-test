@@ -47,6 +47,8 @@ public class TestClient {
 	private FileSystem fs;
 	
 	String appMasterMainClass = "com.hortonworks.TestApplicationMaster";
+
+	private Path inputPath;
 	
 	public TestClient(String [] args) {
 		this.conf = new YarnConfiguration();
@@ -55,6 +57,7 @@ public class TestClient {
 			System.exit(1);
 		}
 		jobInputFolder = args[0];
+		inputPath = new Path(this.jobInputFolder);
 		yarnClient = YarnClient.createYarnClient();
 		yarnClient.init(conf);
 		
@@ -164,7 +167,7 @@ public class TestClient {
 		Vector<CharSequence> vargs = new Vector<CharSequence>(30);
 		String tmpJarFileName = "/tmp/" + appId + ".jar";
 		vargs.add("hadoop fs -copyToLocal hdfs://namenode:8020/" + this.appJarDest + " " + tmpJarFileName 
-					+ "  && hadoop jar " + tmpJarFileName);
+					+ "  && hadoop jar " + tmpJarFileName + " " + this.inputPath);
 		vargs.add("1>/tmp/TestAM.stdout");
 		vargs.add("2>/tmp/TestAM.stderr");
 		StringBuilder command = new StringBuilder();
@@ -199,7 +202,6 @@ public class TestClient {
 	
 	
 	private void processInputFolder() throws IOException {
-		Path inputPath = new Path(this.jobInputFolder);
 		if(fs.isDirectory(inputPath)) {
 			LOG.info("Input path " + jobInputFolder + " is a folder.");
 		} else {
