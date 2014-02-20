@@ -82,7 +82,7 @@ public class TestApplicationMaster {
 		LOG.info("ApplicationMaster is registered with response: " + response.toString());
 		
 		//Create a Container to run httpd
-		startHttpdContainer();
+		startHttpdContainer(false);
 		startSearchContainers();
 		
 		try {
@@ -135,7 +135,7 @@ public class TestApplicationMaster {
 		}
 	}
 
-	private void startHttpdContainer() throws YarnException, IOException {
+	private void startHttpdContainer(boolean killExistingContainer) throws YarnException, IOException {
 		Priority httpdPriority = Records.newRecord(Priority.class);
 		httpdPriority.setPriority(0);
 		Resource capHttp = Records.newRecord(Resource.class);
@@ -154,15 +154,22 @@ public class TestApplicationMaster {
 				++allocatedContainers;
 				//Launch httpd on its Container
 				ContainerLaunchContext ctx = Records.newRecord(ContainerLaunchContext.class);
-				String httpdCommand = "/usr/sbin/httpd -k start";
+				String httpdCommand = "";
+				if(killExistingContainer) {
+					LOG.info("Stopping httpd Container...");
+					httpdCommand = "/usr/sbin/httpd -k stop";
+				} else {
+					LOG.info("Starting httpd Container...");
+					httpdCommand = "/usr/sbin/httpd -k start";
+				}
 				ctx.setCommands(
 						Collections.singletonList(httpdCommand
 								+ " 1>/tmp/httpdstdout"
 								+ " 2>/tmp/httpdstderr")
 					);
-				LOG.info("Starting httpd Container...");
+				
 				nodeManager.startContainer(container, ctx);
-				LOG.info("httpd is now running on host " + container.getNodeHttpAddress());
+				//LOG.info("httpd is now running on host " + container.getNodeHttpAddress());
 				httpdContainerID = container.getId();
 				httpdNodeID = container.getNodeId();
 			}
@@ -172,10 +179,14 @@ public class TestApplicationMaster {
 		}
 		LOG.info("httpd Container is running...");
 	}
-
+	
 	private boolean finish() throws YarnException, IOException {
 		LOG.info("Finishing TestApplicationMaster...");
 		//We need to stop the httpd Container since it will not finish on its own
+		nodeManager.stopContainer(this.httpdContainerID, this.httpdNodeID);
+		//We need to kill the httpd process on node1
+		this.startHttpdContainer(true);
+		//Now we need to kill the Container that we just created
 		nodeManager.stopContainer(this.httpdContainerID, this.httpdNodeID);
 		
 		try {

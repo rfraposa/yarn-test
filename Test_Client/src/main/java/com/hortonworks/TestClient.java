@@ -190,7 +190,7 @@ public class TestClient {
 		appContext.setAMContainerSpec(amContainer);
 		
 		//Write the input folder metainfo to HDFS
-		processInputFolder();
+		//processInputFolder();
 		
 		yarnClient.submitApplication(appContext);
 		
