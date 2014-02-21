@@ -11,6 +11,7 @@ import java.util.Vector;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -26,6 +27,7 @@ import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.QueueInfo;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.api.records.YarnClusterMetrics;
 import org.apache.hadoop.yarn.client.api.YarnClient;
@@ -40,8 +42,8 @@ public class Client {
 	
 	private YarnConfiguration conf;
 	private YarnClient yarnClient;
-	private String appJar = "/home/train/workspace/Test_AM/testam.jar";
-	private String appJarDest = "/user/root/testam.jar";
+	private String appJar = "testclient.jar";
+	//private String appJarDest = "/user/root/testclient.jar";
 	private ApplicationId appId;
 	private String jobInputFolder;
 	private FileSystem fs;
@@ -50,7 +52,7 @@ public class Client {
 
 	private Path inputPath;
 	
-	public Client(String [] args) {
+	public Client(String [] args) throws IOException {
 		this.conf = new YarnConfiguration();
 		if(args.length < 1) {
 			System.out.println("Usage: Client <job_input_folder>");
@@ -60,11 +62,17 @@ public class Client {
 		inputPath = new Path(this.jobInputFolder);
 		yarnClient = YarnClient.createYarnClient();
 		yarnClient.init(conf);
-		
+		fs = FileSystem.get(conf);
 	}
 	
 	public static void main(String[] args) {
-		Client client = new Client(args);
+		Client client = null;
+		try {
+			client = new Client(args);
+		} catch (IOException e1) {
+			e1.printStackTrace();
+			return;
+		}
 		boolean result = false;
 		try {
 			result = client.run();
@@ -127,8 +135,32 @@ public class Client {
 		ContainerLaunchContext amContainer = Records.newRecord(ContainerLaunchContext.class);
 		Map<String, LocalResource> localResources = new HashMap<String, LocalResource>();
 		
-		//Add the ApplicationMaster JAR file to HDFS as a LocalResource
-		fs = FileSystem.get(conf);
+		//Add the application JAR file as a LocalResource
+		
+		Path src = new Path(this.appJar);
+		String pathSuffix = appId.getId() + "/app.jar";
+		Path dest = new Path(fs.getHomeDirectory(), pathSuffix);
+		fs.copyFromLocalFile(false, true, src, dest);
+		FileStatus destStatus = fs.getFileStatus(dest);
+		
+		LocalResource jarResource = Records.newRecord(LocalResource.class);
+		jarResource.setResource(ConverterUtils.getYarnUrlFromPath(dest));
+		jarResource.setSize(destStatus.getLen());
+		jarResource.setTimestamp(destStatus.getModificationTime());
+		jarResource.setType(LocalResourceType.FILE);
+		jarResource.setVisibility(LocalResourceVisibility.APPLICATION);
+		localResources.put("app.jar", jarResource);
+		
+		
+		//Add the app.jar to the Environment so it's available to Containers
+		Map<String,String> env = new HashMap<String,String>();
+		String appJarDest = dest.toUri().toString();
+		env.put("AMJAR", appJarDest);
+		LOG.info("AMJAR environment variable is set to " + appJarDest);		
+		env.put("AMJARTIMESTAMP", Long.toString(destStatus.getModificationTime()));
+		env.put("AMJARLEN", Long.toString(destStatus.getLen()));
+		
+/*		fs = FileSystem.get(conf);
 		Path src = new Path(appJar);
 		//Path dest = new Path(fs.getHomeDirectory(), File.separator + appJar);
 		Path dest = new Path(this.appJarDest);
@@ -147,27 +179,28 @@ public class Client {
 		amJarResource.setTimestamp(destStatus.getModificationTime());
 		amJarResource.setSize(destStatus.getLen());
 		localResources.put("testam.jar", amJarResource);
-		
+*/		
 		amContainer.setLocalResources(localResources);
 
 		//Configure the CLASSPATH of the ApplicationMaster
-		Map<String, String>	env = new HashMap<String, String>();
-		StringBuilder classpathEnv = new StringBuilder("./*"); 
+//		StringBuilder classpathEnv = new StringBuilder("./*"); 
 //				Environment.CLASSPATH.$()).append(
 //				File.pathSeparatorChar).append("./*");
 		
-		for(String c : conf.getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH, YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH)) {
-			classpathEnv.append(File.pathSeparatorChar).append(c.trim());
-		}
-		LOG.info("CLASSPATH for ApplicationMaster = " + classpathEnv);
-		env.put("CLASSPATH", classpathEnv.toString());
+//		for(String c : conf.getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH, YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH)) {
+//			classpathEnv.append(File.pathSeparatorChar).append(c.trim());
+//		}
+//		LOG.info("CLASSPATH for ApplicationMaster = " + classpathEnv);
+//		env.put("CLASSPATH", classpathEnv.toString());
 		amContainer.setEnvironment(env);
 		
 		//Configure the command line argument that launches the ApplicationMaster
 		Vector<CharSequence> vargs = new Vector<CharSequence>(30);
-		String tmpJarFileName = "/tmp/" + appId + ".jar";
-		vargs.add("hadoop fs -copyToLocal hdfs://namenode:8020/" + this.appJarDest + " " + tmpJarFileName 
-					+ "  && hadoop jar " + tmpJarFileName + " " + this.inputPath);
+//		String tmpJarFileName = "/tmp/" + appId + ".jar";
+		vargs.add(  //"hadoop fs -copyToLocal hdfs://namenode:8020/" + this.appJarDest + " " + tmpJarFileName 
+					//+ "  && hadoop jar  " + tmpJarFileName + " " + this.inputPath);
+					//+ "  && " + 
+					"hadoop jar ./app.jar com.hortonworks.ApplicationMaster " + this.inputPath);
 		vargs.add("1>/tmp/TestAM.stdout");
 		vargs.add("2>/tmp/TestAM.stderr");
 		StringBuilder command = new StringBuilder();
@@ -190,7 +223,7 @@ public class Client {
 		appContext.setAMContainerSpec(amContainer);
 		
 		//Write the input folder metainfo to HDFS
-		processInputFolder();
+		//processInputFolder();
 		
 		yarnClient.submitApplication(appContext);
 		
