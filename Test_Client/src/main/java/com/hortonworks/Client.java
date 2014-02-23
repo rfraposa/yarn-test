@@ -47,6 +47,7 @@ public class Client {
 	private ApplicationId appId;
 	private String jobInputFolder;
 	private FileSystem fs;
+	private String searchTerm;
 	
 	String appMasterMainClass = "com.hortonworks.ApplicationMaster";
 
@@ -59,6 +60,7 @@ public class Client {
 			System.exit(1);
 		}
 		jobInputFolder = args[0];
+		this.searchTerm = args[1];
 		inputPath = new Path(this.jobInputFolder);
 		yarnClient = YarnClient.createYarnClient();
 		yarnClient.init(conf);
@@ -200,7 +202,7 @@ public class Client {
 		vargs.add(  //"hadoop fs -copyToLocal hdfs://namenode:8020/" + this.appJarDest + " " + tmpJarFileName 
 					//+ "  && hadoop jar  " + tmpJarFileName + " " + this.inputPath);
 					//+ "  && " + 
-					"hadoop jar ./app.jar com.hortonworks.ApplicationMaster " + this.inputPath);
+					"hadoop jar ./app.jar com.hortonworks.ApplicationMaster " + this.inputPath + " " + this.searchTerm + " ");
 		vargs.add("1>/tmp/TestAM.stdout");
 		vargs.add("2>/tmp/TestAM.stderr");
 		StringBuilder command = new StringBuilder();
@@ -214,8 +216,8 @@ public class Client {
 		
 		//Ask for resources in the ApplicationSubmissionContext
 		Resource capability = Records.newRecord(Resource.class);
-		capability.setMemory(appResponse.getMaximumResourceCapability().getMemory());
-		capability.setVirtualCores(appResponse.getMaximumResourceCapability().getVirtualCores());
+		capability.setMemory(2048);
+		capability.setVirtualCores(1);
 		appContext.setResource(capability);
 		
 
