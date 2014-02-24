@@ -63,12 +63,15 @@ public class Container {
 			fs.delete(outputFile, false);
 			
 			//in = fs.open(this.inputFile);
-			BufferedReader reader = new BufferedReader(new InputStreamReader(fs.open(inputFile)));
+			FSDataInputStream fsdis = fs.open(inputFile);
+			fsdis.seek(this.start);
+			BufferedReader reader = new BufferedReader(new InputStreamReader(fsdis));
 			LOG.info("Reading from " + start + " to " + length + " from " + inputFile.toString());
 			String current = "";
 			results = new ArrayList<String>(5000);
-			
-			while((current = reader.readLine()) != null) {
+			long bytesRead = 0;
+			while(bytesRead < this.length && (current = reader.readLine()) != null) {
+				bytesRead += current.getBytes().length;
 				results.add(current);
 			}
 			

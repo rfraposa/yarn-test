@@ -22,6 +22,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRespo
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
@@ -51,6 +52,7 @@ public class ApplicationMaster {
 	private NodeId httpdNodeID;
 	private List<BlockStatus> blockList;
 	private String searchTerm;
+	private int numOfContainers;
 	
 	public ApplicationMaster(String inputFileName, String searchTerm) throws IOException {
 		conf = new YarnConfiguration();
@@ -87,15 +89,18 @@ public class ApplicationMaster {
 		}
 	}
 
-	private void monitor() {
+	private void monitor() throws YarnException, IOException, InterruptedException {
 		//All the initial Containers are running...this method sends heartbeats to the RM and monitors all running containers
 		LOG.info("Waiting for Containers to finish...");
-		try {
-			Thread.sleep(60000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+		int completedContainers = 0;
+		while(completedContainers < this.numOfContainers) {
+			AllocateResponse response = resourceManager.allocate(completedContainers/numOfContainers);
+			for(ContainerStatus status : response.getCompletedContainersStatuses()) {
+				++completedContainers;
+				LOG.info("Container just finished: " + status.toString());
+			}
+			Thread.sleep(100);
 		}
-		
 	}
 
 	public boolean run() throws YarnException, IOException, URISyntaxException {
@@ -123,7 +128,7 @@ public class ApplicationMaster {
 		Resource capacity = Records.newRecord(Resource.class);
 		capacity.setMemory(2048);
 		
-		int numOfContainers = 0;
+		numOfContainers = 0;
 		for(BlockLocation block : blocks) {
 			ContainerRequest ask = new ContainerRequest(capacity,block.getHosts(),null,priority,false);
 			for(String host : block.getHosts()) {
