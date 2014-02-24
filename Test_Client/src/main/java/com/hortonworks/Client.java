@@ -75,6 +75,7 @@ public class Client {
 		//Now create the output folder
 		fs.create(outputPath);
 		fs.setOwner(outputPath, "yarn", "yarn");
+		fs.setPermission(outputPath, new FSPermission());
 	
 	}
 	
