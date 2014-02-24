@@ -74,7 +74,7 @@ public class Client {
       fs.delete(outputPath, true);
     }
     // Now create the output folder
-    fs.create(outputPath);
+    fs.mkdirs(outputPath);
     // fs.setOwner(outputPath, "yarn", "yarn");
     fs.setPermission(outputPath, FsPermission.getDirDefault());
 
