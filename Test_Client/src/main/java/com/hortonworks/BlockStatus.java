@@ -4,40 +4,40 @@ import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.yarn.api.records.Container;
 
 public class BlockStatus {
-	private BlockLocation location;
-	private Container container;
-	private boolean processed;
-	private boolean started;
-	
-	public BlockStatus(BlockLocation location) {
-		this.location = location;
-	}
+  private BlockLocation location;
+  private Container container;
+  private boolean processed;
+  private boolean started;
 
-	public Container getContainer() {
-		return container;
-	}
+  public BlockStatus(BlockLocation location) {
+    this.location = location;
+  }
 
-	public void setContainer(Container container) {
-		this.container = container;
-	}
+  public Container getContainer() {
+    return container;
+  }
 
-	public boolean isProcessed() {
-		return processed;
-	}
+  public void setContainer(Container container) {
+    this.container = container;
+  }
 
-	public void setProcessed(boolean processed) {
-		this.processed = processed;
-	}
+  public boolean isProcessed() {
+    return processed;
+  }
 
-	public boolean isStarted() {
-		return started;
-	}
+  public void setProcessed(boolean processed) {
+    this.processed = processed;
+  }
 
-	public void setStarted(boolean started) {
-		this.started = started;
-	}
-	
-	public BlockLocation getLocation() {
-		return location;
-	}
+  public boolean isStarted() {
+    return started;
+  }
+
+  public void setStarted(boolean started) {
+    this.started = started;
+  }
+
+  public BlockLocation getLocation() {
+    return location;
+  }
 }

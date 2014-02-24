@@ -7,98 +7,99 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Container {
-	private static final Log LOG = LogFactory.getLog(Container.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Container.class);
 
-	private Path inputFile;
-	private long start;
-	private int length;
-	private FileSystem fs;
-	private YarnConfiguration conf;
-	private String hostname;
-	private Path outputFile;
-	ArrayList<String> results;
-	private String searchTerm;
+  private Path inputFile;
+  private long start;
+  private int length;
+  private FileSystem fs;
+  private YarnConfiguration conf;
+  private String hostname;
+  private Path outputFile;
+  ArrayList<String> results;
+  private String searchTerm;
 
-	private String outputFolder;
-	
-	public Container(String [] args) throws IOException {
-		hostname = NetUtils.getHostname();
-		inputFile = new Path(args[0]);
-		start = Long.valueOf(args[1]);
-		length = Integer.valueOf(args[2]);
-		searchTerm = args[3];
-		outputFolder = args[4];
-		outputFile = new Path(this.outputFolder + "/result_" + start);
-	}
+  private String outputFolder;
 
-	public static void main(String[] args) {
-		LOG.info("Container just started on " + NetUtils.getHostname());
-		Container container;
-		try {
-			container = new Container(args);
-			container.run();
-		} catch (Exception e) {
-			LOG.info("Eror running Container on " + NetUtils.getHostname());
-			e.printStackTrace();
-		}
-		
-		LOG.info("Container is ending...");
-	}
+  public Container(String[] args) throws IOException {
+    hostname = NetUtils.getHostname();
+    inputFile = new Path(args[0]);
+    start = Long.valueOf(args[1]);
+    length = Integer.valueOf(args[2]);
+    searchTerm = args[3];
+    outputFolder = args[4];
+    outputFile = new Path(this.outputFolder + "/result_" + start);
+  }
 
-	private  void run() throws IOException {
-		LOG.info("Running Container on " + this.hostname);
-		long bytesRead = 0;
-		try {
-			conf = new YarnConfiguration();
-			fs = FileSystem.get(conf);
-			fs.delete(outputFile, false);
-			
-			//in = fs.open(this.inputFile);
-			FSDataInputStream fsdis = fs.open(inputFile);
-			fsdis.seek(this.start);
-			BufferedReader reader = new BufferedReader(new InputStreamReader(fsdis));
-			LOG.info("Reading from " + start + " to " + length + " from " + inputFile.toString());
-			String current = "";
-			results = new ArrayList<String>();
-			
-			while(bytesRead < this.length && (current = reader.readLine()) != null) {
-				bytesRead += current.getBytes().length;
-				if(current.contains(searchTerm)) {
-					results.add(current);
-				}
-			}
-			
-			LOG.info("Just found " + results.size() + " entries from " + this.inputFile + " on host " + NetUtils.getHostname());
-		} catch (IOException e) {
-			LOG.info("Unable to open file at " + inputFile.toString());
-			e.printStackTrace();
-			return;
-		} 
-		if(results.size() > 0)	{
-			LOG.info("Writing results to HDFS...");
-			fs.create(outputFile);
-			FSDataOutputStream fsout = fs.create(outputFile, true);
-			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fsout));
-			try {
-				for(String current : results) {
-					writer.write(current + "\n");
-				}
-			} finally {
-				writer.close();
-			}
-		} else {
-			LOG.info("Search term not found in current block at " + this.start);
-		}
-	}
+  public static void main(String[] args) {
+    LOG.info("Container just started on {}", NetUtils.getHostname());
+    Container container;
+    try {
+      container = new Container(args);
+      container.run();
+    }
+    catch (Exception e) {
+      LOG.info("Eror running Container on {}", NetUtils.getHostname());
+      e.printStackTrace();
+    }
+
+    LOG.info("Container is ending...");
+  }
+
+  private void run() throws IOException {
+    LOG.info("Running Container on {}", this.hostname);
+    long bytesRead = 0;
+    try {
+      conf = new YarnConfiguration();
+      fs = FileSystem.get(conf);
+      fs.delete(outputFile, false);
+
+      // in = fs.open(this.inputFile);
+      FSDataInputStream fsdis = fs.open(inputFile);
+      fsdis.seek(this.start);
+      BufferedReader reader = new BufferedReader(new InputStreamReader(fsdis));
+      LOG.info("Reading from {} to {} from {}", start, length, inputFile.toString());
+      String current = "";
+      results = new ArrayList<String>();
+
+      while (bytesRead < this.length && (current = reader.readLine()) != null) {
+        bytesRead += current.getBytes().length;
+        if (current.contains(searchTerm)) {
+          results.add(current);
+        }
+      }
+
+      LOG.info("Just found {} entries from {} on host {}", results.size(), this.inputFile, NetUtils.getHostname());
+    }
+    catch (IOException e) {
+      LOG.info("Unable to open file at {}", inputFile.toString());
+      e.printStackTrace();
+      return;
+    }
+
+    if (results.size() > 0) {
+      LOG.info("Writing results to HDFS...");
+      fs.create(outputFile);
+      FSDataOutputStream fsout = fs.create(outputFile, true);
+      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fsout));) {
+        for (String current : results) {
+          writer.write(current + "\n");
+        }
+      }
+    }
+    else {
+      LOG.info("Search term not found in current block at {}", this.start);
+    }
+  }
 
 }
