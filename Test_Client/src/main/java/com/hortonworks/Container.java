@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -27,8 +26,10 @@ public class Container {
 	private YarnConfiguration conf;
 	private String hostname;
 	private Path outputFile;
-	List<String> results;
+	ArrayList<String> results;
 	private String searchTerm;
+
+	private String outputFolder;
 	
 	public Container(String [] args) throws IOException {
 		hostname = NetUtils.getHostname();
@@ -36,7 +37,8 @@ public class Container {
 		start = Long.valueOf(args[1]);
 		length = Integer.valueOf(args[2]);
 		searchTerm = args[3];
-		outputFile = new Path("/user/yarn/output/data_" + start);
+		outputFolder = args[4];
+		outputFile = new Path(this.outputFolder + "/result_" + start);
 	}
 
 	public static void main(String[] args) {
@@ -55,7 +57,7 @@ public class Container {
 
 	private  void run() throws IOException {
 		LOG.info("Running Container on " + this.hostname);
-
+		long bytesRead = 0;
 		try {
 			conf = new YarnConfiguration();
 			fs = FileSystem.get(conf);
@@ -67,32 +69,35 @@ public class Container {
 			BufferedReader reader = new BufferedReader(new InputStreamReader(fsdis));
 			LOG.info("Reading from " + start + " to " + length + " from " + inputFile.toString());
 			String current = "";
-			results = new ArrayList<String>(5000);
-			long bytesRead = 0;
+			results = new ArrayList<String>();
+			
 			while(bytesRead < this.length && (current = reader.readLine()) != null) {
 				bytesRead += current.getBytes().length;
-				results.add(current);
+				if(current.contains(searchTerm)) {
+					results.add(current);
+				}
 			}
 			
-			LOG.info("Just read " + results.size() + " lines from " + this.inputFile + " on host " + NetUtils.getHostname());
+			LOG.info("Just found " + results.size() + " entries from " + this.inputFile + " on host " + NetUtils.getHostname());
 		} catch (IOException e) {
 			LOG.info("Unable to open file at " + inputFile.toString());
 			e.printStackTrace();
 			return;
 		} 
-		LOG.info("Writing bytes to HDFS...");
-		fs.create(outputFile);
-		FSDataOutputStream fsout = fs.create(outputFile, true);
-		//FileOutputStream fsout = new FileOutputStream("/tmp/container.txt");
-		BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fsout));
-		try {
-			for(String current : results) {
-				if(current.contains(searchTerm)) {
+		if(results.size() > 0)	{
+			LOG.info("Writing results to HDFS...");
+			fs.create(outputFile);
+			FSDataOutputStream fsout = fs.create(outputFile, true);
+			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fsout));
+			try {
+				for(String current : results) {
 					writer.write(current + "\n");
 				}
+			} finally {
+				writer.close();
 			}
-		} finally {
-			writer.close();
+		} else {
+			LOG.info("Search term not found in current block at " + this.start);
 		}
 	}
 

@@ -53,8 +53,9 @@ public class ApplicationMaster {
 	private List<BlockStatus> blockList;
 	private String searchTerm;
 	private int numOfContainers;
+	private String outputFolder;
 	
-	public ApplicationMaster(String inputFileName, String searchTerm) throws IOException {
+	public ApplicationMaster(String [] args) throws IOException { // inputFileName, String searchTerm) throws IOException {
 		conf = new YarnConfiguration();
 		resourceManager = AMRMClient.createAMRMClient();
 		resourceManager.init(conf);
@@ -65,8 +66,10 @@ public class ApplicationMaster {
 		nodeManager.start();
 		
 		fileSystem = FileSystem.get(conf);
-		inputFile = new Path(inputFileName);
-		this.searchTerm = searchTerm;
+		inputFile = new Path(args[0]);
+		this.searchTerm = args[1];
+		outputFolder = args[2];
+		
 		
 		blockList = new ArrayList<BlockStatus>();
 	}
@@ -75,7 +78,7 @@ public class ApplicationMaster {
 		
 		ApplicationMaster appMaster = null;
 		try {
-			appMaster = new ApplicationMaster(args[0], args[1]);
+			appMaster = new ApplicationMaster(args);
 		} catch (IOException e1) {
 			e1.printStackTrace();
 			return;
@@ -244,7 +247,8 @@ public class ApplicationMaster {
 		LOG.info("Reading block starting at " + offsetString + " and length " + lengthString);
 		vargs.add(offsetString); //Offset into the file
 		vargs.add(lengthString); //Number of bytes to read
-		vargs.add(this.searchTerm);
+		vargs.add(this.searchTerm); //The term we are searching for
+		vargs.add(this.outputFolder); //Folder in HDFS to store results
 		
 		vargs.add("1>/tmp/TestContainer.stdout");
 		vargs.add("2>/tmp/TestContainer.stderr");

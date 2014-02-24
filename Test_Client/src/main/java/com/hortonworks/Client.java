@@ -49,19 +49,33 @@ public class Client {
 	String appMasterMainClass = "com.hortonworks.ApplicationMaster";
 
 	private Path inputPath;
+
+	private String outputFolder;
 	
 	public Client(String [] args) throws IOException {
 		this.conf = new YarnConfiguration();
-		if(args.length < 1) {
-			System.out.println("Usage: Client <job_input_folder>");
+		if(args.length < 3) {
+			System.out.println("Usage: Client <job_input_folder> <search_term> <job_output_folder>");
 			System.exit(1);
 		}
-		jobInputFolder = args[0];
+		this.jobInputFolder = args[0];
 		this.searchTerm = args[1];
+		this.outputFolder = args[2];
 		inputPath = new Path(this.jobInputFolder);
+		
 		yarnClient = YarnClient.createYarnClient();
 		yarnClient.init(conf);
 		fs = FileSystem.get(conf);
+
+		//Delete the output folder
+		Path outputPath = new Path(outputFolder);
+		if(fs.exists(outputPath)) {
+			fs.delete(outputPath, true);
+		}
+		//Now create the output folder
+		fs.create(outputPath);
+		fs.setOwner(outputPath, "yarn", "yarn");
+	
 	}
 	
 	public static void main(String[] args) {
@@ -159,47 +173,15 @@ public class Client {
 		env.put("AMJARTIMESTAMP", Long.toString(destStatus.getModificationTime()));
 		env.put("AMJARLEN", Long.toString(destStatus.getLen()));
 		
-/*		fs = FileSystem.get(conf);
-		Path src = new Path(appJar);
-		//Path dest = new Path(fs.getHomeDirectory(), File.separator + appJar);
-		Path dest = new Path(this.appJarDest);
-		String appJarUri = dest.toUri().toString();
-		LOG.info("Adding " + appJar + " to HDFS folder " + appJarUri);
-		LOG.info("FileSystem info: " + fs.getCanonicalServiceName() + " " + fs.getHomeDirectory());
-		fs.copyFromLocalFile(false, true, src, dest);
-		FileStatus destStatus = fs.getFileLinkStatus(dest);
-		LOG.info("Status of " + appJarUri + " = " + destStatus);
-		LocalResource amJarResource = Records.newRecord(LocalResource.class);
-		amJarResource.setType(LocalResourceType.FILE);
-		amJarResource.setVisibility(LocalResourceVisibility.APPLICATION);
-		Path amJarPath = new Path("hdfs://namenode:8020" + this.appJarDest);
-		amJarResource.setResource(ConverterUtils.getYarnUrlFromPath(amJarPath));
-		LOG.info("Adding resource JAR = " +  amJarPath.toString());
-		amJarResource.setTimestamp(destStatus.getModificationTime());
-		amJarResource.setSize(destStatus.getLen());
-		localResources.put("testam.jar", amJarResource);
-*/		
 		amContainer.setLocalResources(localResources);
-
-		//Configure the CLASSPATH of the ApplicationMaster
-//		StringBuilder classpathEnv = new StringBuilder("./*"); 
-//				Environment.CLASSPATH.$()).append(
-//				File.pathSeparatorChar).append("./*");
-		
-//		for(String c : conf.getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH, YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH)) {
-//			classpathEnv.append(File.pathSeparatorChar).append(c.trim());
-//		}
-//		LOG.info("CLASSPATH for ApplicationMaster = " + classpathEnv);
-//		env.put("CLASSPATH", classpathEnv.toString());
 		amContainer.setEnvironment(env);
 		
 		//Configure the command line argument that launches the ApplicationMaster
 		Vector<CharSequence> vargs = new Vector<CharSequence>(30);
-//		String tmpJarFileName = "/tmp/" + appId + ".jar";
-		vargs.add(  //"hadoop fs -copyToLocal hdfs://namenode:8020/" + this.appJarDest + " " + tmpJarFileName 
-					//+ "  && hadoop jar  " + tmpJarFileName + " " + this.inputPath);
-					//+ "  && " + 
-					"hadoop jar ./app.jar com.hortonworks.ApplicationMaster " + this.inputPath + " " + this.searchTerm + " ");
+		vargs.add("hadoop jar ./app.jar com.hortonworks.ApplicationMaster " 
+					+ this.inputPath + " " 
+					+ this.searchTerm + " "
+					+ this.outputFolder + " ");
 		vargs.add("1>/tmp/TestAM.stdout");
 		vargs.add("2>/tmp/TestAM.stderr");
 		StringBuilder command = new StringBuilder();
