@@ -114,7 +114,7 @@ public class ApplicationMaster {
 		LOG.info("ApplicationMaster is registered with response: " + response.toString());
 		
 		//Create a Container to run httpd
-		//startHttpdContainer(false);
+		startHttpdContainer(false);
 		startSearchContainers();
 		
 		return true;
@@ -190,8 +190,6 @@ public class ApplicationMaster {
 	 * @throws IOException 
 	 */
 	private String getLaunchContainerCommand(Container container) throws IOException {
-		long offset = 0;
-		int length = 0;
 		String hostname = container.getNodeHttpAddress();
 		boolean foundContainer = false;
 		BlockStatus blockToProcess = null;
@@ -220,7 +218,6 @@ public class ApplicationMaster {
 			//Just find any block to process
 			LOG.info("Data locality not found - trying another node");
 			for(BlockStatus current : blockList) {
-				LOG.info("Container for block " + current.getLocation().getOffset() + " started = " + current.isStarted());
 				if(!current.isStarted()) {
 					blockToProcess = current;
 					current.setStarted(true);
@@ -307,11 +304,11 @@ public class ApplicationMaster {
 	private boolean finish() throws YarnException, IOException {
 		LOG.info("Finishing ApplicationMaster...");
 		//We need to stop the httpd Container since it will not finish on its own
-	//	nodeManager.stopContainer(this.httpdContainerID, this.httpdNodeID);
+		nodeManager.stopContainer(this.httpdContainerID, this.httpdNodeID);
 		//We need to kill the httpd process on node1
-	//	this.startHttpdContainer(true);
+		this.startHttpdContainer(true);
 		//Now we need to kill the Container that we just created
-	//	nodeManager.stopContainer(this.httpdContainerID, this.httpdNodeID);
+		nodeManager.stopContainer(this.httpdContainerID, this.httpdNodeID);
 		
 		try {
 			resourceManager.unregisterApplicationMaster(FinalApplicationStatus.SUCCEEDED, "Finishing ApplicationMaster", null);

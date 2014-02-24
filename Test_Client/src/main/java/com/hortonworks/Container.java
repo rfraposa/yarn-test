@@ -55,7 +55,6 @@ public class Container {
 
 	private  void run() throws IOException {
 		LOG.info("Running Container on " + this.hostname);
-		FSDataInputStream in = null;
 
 		try {
 			conf = new YarnConfiguration();
