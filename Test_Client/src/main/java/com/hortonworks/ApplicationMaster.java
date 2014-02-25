@@ -91,7 +91,7 @@ public class ApplicationMaster {
       AllocateResponse response = resourceManager.allocate(completedContainers / numOfContainers);
       for (ContainerStatus status : response.getCompletedContainersStatuses()) {
         ++completedContainers;
-        LOG.info("Container just finished: {}", status.toString());
+        LOG.info("Container {} just finished: {}", status.getContainerId(), status.toString());
       }
       Thread.sleep(100);
     }

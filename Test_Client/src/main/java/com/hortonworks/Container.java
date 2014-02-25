@@ -70,7 +70,7 @@ public class Container {
       FSDataInputStream fsdis = fs.open(inputFile);
       fsdis.seek(this.start);
       BufferedReader reader = new BufferedReader(new InputStreamReader(fsdis));
-      LOG.info("Reading from {} to {} from {}", start, length, inputFile.toString());
+      LOG.info("Reading from {} to {} from {}", start, start + length, inputFile.toString());
       String current = "";
       results = new ArrayList<String>();
 
