@@ -1,5 +1,6 @@
 package com.hortonworks;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
@@ -38,10 +40,11 @@ import org.slf4j.LoggerFactory;
 public class Client {
   private static final Logger LOG = LoggerFactory.getLogger(Client.class);
 
+  private static final String APP_NAME = "YARN_test";
+
   private YarnConfiguration conf;
   private YarnClient yarnClient;
   private String appJar = "testclient.jar";
-  // private String appJarDest = "/user/root/testclient.jar";
   private ApplicationId appId;
   private String jobInputFolder;
   private FileSystem fs;
@@ -75,9 +78,9 @@ public class Client {
     }
     // Now create the output folder
     fs.mkdirs(outputPath);
-    // fs.setOwner(outputPath, "yarn", "yarn");
     fs.setPermission(outputPath, FsPermission.getDirDefault());
 
+    Log4jPropertyHelper.updateLog4jConfiguration(Client.class);
   }
 
   public static void main(String[] args) {
@@ -114,10 +117,18 @@ public class Client {
 
       if (state == YarnApplicationState.FINISHED) {
         LOG.info("Application is finished!");
+
+        // Remove cached program artifacts in HDFS
+        fs.delete(new Path(fs.getHomeDirectory(), APP_NAME + "/" + appId.getId() + "/app.jar"), true);
+
         return;
       }
       else if (state == YarnApplicationState.KILLED || state == YarnApplicationState.FAILED) {
         LOG.info("Application did not finish.");
+
+        // Remove cached program artifacts in HDFS
+        fs.delete(new Path(fs.getHomeDirectory(), APP_NAME + "/" + appId.getId() + "/app.jar"), true);
+
         return;
       }
     }
@@ -135,7 +146,7 @@ public class Client {
 
     // Set the application name
     ApplicationSubmissionContext appContext = app.getApplicationSubmissionContext();
-    appContext.setApplicationName("Test_YARN");
+    appContext.setApplicationName(APP_NAME);
 
     // Create the Container launch context for the ApplicationMaster
     ContainerLaunchContext amContainer = Records.newRecord(ContainerLaunchContext.class);
@@ -144,7 +155,7 @@ public class Client {
     // Add the application JAR file as a LocalResource
 
     Path src = new Path(this.appJar);
-    String pathSuffix = appId.getId() + "/app.jar";
+    String pathSuffix = APP_NAME + "/" + appId.getId() + "/app.jar";
     Path dest = new Path(fs.getHomeDirectory(), pathSuffix);
     fs.copyFromLocalFile(false, true, src, dest);
     FileStatus destStatus = fs.getFileStatus(dest);
@@ -172,8 +183,8 @@ public class Client {
     Vector<CharSequence> vargs = new Vector<>(30);
     vargs.add("yarn jar ./app.jar com.hortonworks.ApplicationMaster " + this.inputPath + " " + this.searchTerm + " "
         + this.outputFolder + " ");
-    vargs.add("1>/tmp/TestAM.stdout");
-    vargs.add("2>/tmp/TestAM.stderr");
+    vargs.add("1><LOG_DIR>/TestAM.stdout");
+    vargs.add("2><LOG_DIR>/TestAM.stderr");
     StringBuilder command = new StringBuilder();
     for (CharSequence str : vargs) {
       command.append(str).append(" ");
@@ -186,7 +197,6 @@ public class Client {
     // Ask for resources in the ApplicationSubmissionContext
     Resource capability = Records.newRecord(Resource.class);
     capability.setMemory(1024);
-    // capability.setVirtualCores(1);
     appContext.setResource(capability);
 
     // Set the Container launch context with the ApplicationSubmissionContext

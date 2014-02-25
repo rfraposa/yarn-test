@@ -39,6 +39,8 @@ public class Container {
     searchTerm = args[3];
     outputFolder = args[4];
     outputFile = new Path(this.outputFolder + "/result_" + start);
+
+    Log4jPropertyHelper.updateLog4jConfiguration(Client.class);
   }
 
   public static void main(String[] args) {

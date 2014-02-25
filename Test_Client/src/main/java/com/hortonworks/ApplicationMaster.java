@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,14 +17,12 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
-import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
@@ -46,8 +43,6 @@ public class ApplicationMaster {
   private NMClient nodeManager;
   private FileSystem fileSystem;
   private Path inputFile;
-  private ContainerId httpdContainerID;
-  private NodeId httpdNodeID;
   private List<BlockStatus> blockList;
   private String searchTerm;
   private int numOfContainers;
@@ -69,6 +64,8 @@ public class ApplicationMaster {
     outputFolder = args[2];
 
     blockList = new ArrayList<>();
+
+    Log4jPropertyHelper.updateLog4jConfiguration(Client.class);
   }
 
   public static void main(String[] args) {
@@ -110,8 +107,6 @@ public class ApplicationMaster {
     RegisterApplicationMasterResponse response = resourceManager.registerApplicationMaster(appHostName, appHostPort, appTrackingUrl);
     LOG.info("ApplicationMaster is registered with response: {}", response.toString());
 
-    // Create a Container to run httpd
-    startHttpdContainer(false);
     startSearchContainers();
 
     return true;
@@ -226,7 +221,7 @@ public class ApplicationMaster {
       }
     }
     if (foundContainer) {
-      LOG.info("Processing block from {} on a Container running on {}",  blockToProcess.getLocation(), container.getNodeHttpAddress());
+      LOG.info("Processing block from {} on a Container running on {}", blockToProcess.getLocation(), container.getNodeHttpAddress());
     }
     else {
       LOG.error("No container found to handle block!");
@@ -245,8 +240,8 @@ public class ApplicationMaster {
     vargs.add(this.searchTerm); // The term we are searching for
     vargs.add(this.outputFolder); // Folder in HDFS to store results
 
-    vargs.add("1>/tmp/TestContainer.stdout");
-    vargs.add("2>/tmp/TestContainer.stderr");
+    vargs.add("1><LOG_DIR>/TestContainer.stdout");
+    vargs.add("2><LOG_DIR>/TestContainer.stderr");
     StringBuilder command = new StringBuilder();
     for (CharSequence str : vargs) {
       command.append(str).append(" ");
@@ -255,57 +250,8 @@ public class ApplicationMaster {
     return command.toString();
   }
 
-  private void startHttpdContainer(boolean killExistingContainer) throws YarnException, IOException {
-    Priority httpdPriority = Records.newRecord(Priority.class);
-    httpdPriority.setPriority(0);
-    Resource capHttp = Records.newRecord(Resource.class);
-    capHttp.setMemory(128);
-    String[] hosts = { "node1" };
-    ContainerRequest httpAsk = new ContainerRequest(capHttp, hosts, null, httpdPriority, false);
-    LOG.info("Requesting a Container for httpd");
-    resourceManager.addContainerRequest(httpAsk);
-    LOG.info("Allocating the httpd Container...");
-
-    int allocatedContainers = 0;
-    while (allocatedContainers < 1) {
-      AllocateResponse allocResponse = resourceManager.allocate(0);
-      LOG.info("Containers allocated with resources {}", allocResponse.getAvailableResources());
-      for (Container container : allocResponse.getAllocatedContainers()) {
-        ++allocatedContainers;
-        // Launch httpd on its Container
-        ContainerLaunchContext ctx = Records.newRecord(ContainerLaunchContext.class);
-        String httpdCommand = "";
-        if (killExistingContainer) {
-          LOG.info("Stopping httpd Container...");
-          httpdCommand = "/usr/sbin/httpd -k stop";
-        }
-        else {
-          LOG.info("Starting httpd Container...");
-          httpdCommand = "/usr/sbin/httpd -k start";
-        }
-        ctx.setCommands(Collections.singletonList(httpdCommand + " 1>/tmp/httpdstdout" + " 2>/tmp/httpdstderr"));
-
-        nodeManager.startContainer(container, ctx);
-        httpdContainerID = container.getId();
-        httpdNodeID = container.getNodeId();
-      }
-      try {
-        Thread.sleep(100);
-      }
-      catch (InterruptedException e) {
-      }
-    }
-    LOG.info("httpd Container is running...");
-  }
-
   private boolean finish() throws YarnException, IOException {
     LOG.info("Finishing ApplicationMaster...");
-    // We need to stop the httpd Container since it will not finish on its own
-    nodeManager.stopContainer(this.httpdContainerID, this.httpdNodeID);
-    // We need to kill the httpd process on node1
-    this.startHttpdContainer(true);
-    // Now we need to kill the Container that we just created
-    nodeManager.stopContainer(this.httpdContainerID, this.httpdNodeID);
 
     try {
       resourceManager.unregisterApplicationMaster(FinalApplicationStatus.SUCCEEDED, "Finishing ApplicationMaster", null);
