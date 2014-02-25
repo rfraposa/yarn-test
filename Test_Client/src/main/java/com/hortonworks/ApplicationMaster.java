@@ -65,7 +65,7 @@ public class ApplicationMaster {
 
     blockList = new ArrayList<>();
 
-    Log4jPropertyHelper.updateLog4jConfiguration(Client.class);
+    Log4jPropertyHelper.updateLog4jConfiguration(ApplicationMaster.class);
   }
 
   public static void main(String[] args) {
