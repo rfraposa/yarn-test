@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+./settings/*
+=======
 build
 testclient.jar
 bin
 .gradle
+>>>>>>> cd3a848d7ebaa697eeabe90abff1209a86182086
