@@ -51,7 +51,7 @@ public class Container {
       container.run();
     }
     catch (Exception e) {
-      LOG.info("Eror running Container on {}", NetUtils.getHostname());
+      LOG.info("Error running Container on {}", NetUtils.getHostname());
       e.printStackTrace();
     }
 
@@ -91,7 +91,6 @@ public class Container {
 
     if (results.size() > 0) {
       LOG.info("Writing results to HDFS...");
-      fs.create(outputFile);
       FSDataOutputStream fsout = fs.create(outputFile, true);
       try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fsout));) {
         for (String current : results) {
