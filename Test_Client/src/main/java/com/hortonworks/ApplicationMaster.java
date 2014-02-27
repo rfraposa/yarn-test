@@ -63,7 +63,7 @@ public class ApplicationMaster {
   private volatile boolean done;
 
   // Launch threads
-  private List<Thread> launchThreads = new ArrayList<Thread>();
+  private List<Thread> launchThreads = new ArrayList<>();
 
   public ApplicationMaster(String[] args) throws IOException {
     conf = new YarnConfiguration();
