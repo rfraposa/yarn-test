@@ -18,6 +18,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
@@ -74,8 +75,6 @@ public class ApplicationMaster {
     outputFolder = args[2];
 
     blockList = new ArrayList<>();
-
-    Log4jPropertyHelper.updateLog4jConfiguration(ApplicationMaster.class);
   }
 
   public static void main(String[] args) {
@@ -203,6 +202,7 @@ public class ApplicationMaster {
         LOG.info("Added {} as a local resource to each Container", appJarFile.toString());
 
         ContainerLaunchContext context = Records.newRecord(ContainerLaunchContext.class);
+        context.setEnvironment(env);
         context.setLocalResources(localResources);
 
         String command = getLaunchContainerCommand(container);
@@ -280,10 +280,11 @@ public class ApplicationMaster {
       LOG.error("No container found to handle block!");
       return "sleep 5";
     }
-
+    
     // Configure the command line argument that launches the Container
     Vector<CharSequence> vargs = new Vector<>(30);
-    vargs.add("yarn jar ./app.jar com.hortonworks.Container ");
+    vargs.add(Environment.JAVA_HOME.$() + "/bin/java");
+    vargs.add("com.hortonworks.Container ");
     vargs.add(inputFile.toString()); // File to read
     String offsetString = Long.toString(blockToProcess.getLocation().getOffset());
     String lengthString = Long.toString(blockToProcess.getLocation().getLength());

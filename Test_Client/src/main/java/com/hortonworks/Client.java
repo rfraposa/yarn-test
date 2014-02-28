@@ -1,5 +1,6 @@
 package com.hortonworks;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
@@ -77,8 +79,6 @@ public class Client {
     // Now create the output folder
     fs.mkdirs(outputPath);
     fs.setPermission(outputPath, FsPermission.getDirDefault());
-
-    Log4jPropertyHelper.updateLog4jConfiguration(Client.class);
   }
 
   public static void main(String[] args) {
@@ -174,13 +174,25 @@ public class Client {
     env.put("AMJARTIMESTAMP", Long.toString(destStatus.getModificationTime()));
     env.put("AMJARLEN", Long.toString(destStatus.getLen()));
 
+    // Required in order for custom log4j configuration to be found on the
+    // classpath. The framework should really handle most of this automatically
+    StringBuilder classPathEnv = new StringBuilder().append(File.pathSeparatorChar).append("./app.jar");
+    for (String c : conf
+        .getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH, YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH)) {
+      classPathEnv.append(File.pathSeparatorChar);
+      classPathEnv.append(c.trim());
+    }
+    classPathEnv.append(File.pathSeparatorChar);
+    classPathEnv.append(Environment.CLASSPATH.$());
+    env.put("CLASSPATH", classPathEnv.toString());
+
     amContainer.setLocalResources(localResources);
     amContainer.setEnvironment(env);
 
     // Configure the command line argument that launches the ApplicationMaster
     Vector<CharSequence> vargs = new Vector<>(30);
-    vargs.add("yarn jar ./app.jar com.hortonworks.ApplicationMaster " + this.inputPath + " " + this.searchTerm + " "
-        + this.outputFolder + " ");
+    vargs.add(Environment.JAVA_HOME.$() + "/bin/java");
+    vargs.add(String.format("com.hortonworks.ApplicationMaster %s %s %s ", this.inputPath, this.searchTerm, this.outputFolder));
     vargs.add("1><LOG_DIR>/TestAM.stdout");
     vargs.add("2><LOG_DIR>/TestAM.stderr");
     StringBuilder command = new StringBuilder();
